@@ -13,6 +13,7 @@ name: The name of the listing - text
 host_id: The id of the user creating the listing - integer  
 
 host_profile_id: The id of the profile of the user - integer
+
 host_name: Name of the user - text
 neighbourhood_group: The neighbourhood group as geocoded using the latitude and longitude against neighborhoods as defined by open or public digital shapefiles - text
 neighbourhood: text
