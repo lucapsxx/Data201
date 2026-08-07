@@ -6,9 +6,12 @@ Dataset
 source: https://docs.google.com/spreadsheets/d/1iWCNJcSutYqpULSQHlNyGInUvHg2BoUGoNRIGa6Szc4/edit?gid=1322284596#gid=1322284596
 
 Columns
-id: The unique ID of every listing - integer. 
-name: The name of the listing - text
-host_id: The id of the user creating the listing - integer
+id: The unique ID of every listing - integer  
+
+name: The name of the listing - text  
+
+host_id: The id of the user creating the listing - integer  
+
 host_profile_id: The id of the profile of the user - integer
 host_name: Name of the user - text
 neighbourhood_group: The neighbourhood group as geocoded using the latitude and longitude against neighborhoods as defined by open or public digital shapefiles - text
