@@ -8,7 +8,11 @@ df_chch = df[df["region_parent_name"] == "Christchurch City"].copy()
 print(df_chch.shape)
 df_chch["month_year"] = "2026-5"
 
+df["price"] = df["price"].replace('[\$,]', '', regex=True).astype(float)
+df_chch["price"] = df_chch["price"].replace('[\$,]', '', regex=True).astype(float)
 
+print(df["price"].dtype)
+print(df["price"].head())
 
 #4. Tout combiner proprement dans un seul résumé lisible (pratique si vous avez 96 colonnes) :
 def summarize(df):
@@ -34,6 +38,7 @@ import matplotlib.pyplot as plt
 
 # Histogrammes séparés
 
+
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 df["price"].hist(bins=50, ax=axes[0])
 axes[0].set_title("Distribution des prix - Nouvelle-Zélande")
@@ -47,23 +52,11 @@ plt.tight_layout()
 plt.show()
 
 
-#Tâche bonus — les deux sur le même graphique :
-
-
-plt.figure(figsize=(8, 5))
-df["price"].hist(bins=50, alpha=0.5, label="Nouvelle-Zélande")
-df_chch["price"].hist(bins=50, alpha=0.5, label="Christchurch")
-plt.xlabel("Prix")
-plt.ylabel("Nombre d'annonces")
-plt.title("Distribution des prix : NZ vs Christchurch")
-plt.legend()
-plt.show()
 
 #Jours depuis le dernier avis
 
 df_chch["last_review"] = pd.to_datetime(df_chch["last_review"])
 df_chch["last_scraped"] = pd.to_datetime(df_chch["last_scraped"])
-
 df_chch["days_since_last_review"] = (df_chch["last_scraped"] - df_chch["last_review"]).dt.days
 
 plt.figure(figsize=(8, 5))
@@ -74,13 +67,11 @@ plt.title("Distribution du délai depuis le dernier avis - Christchurch")
 plt.show()
 
 
-
 #Top 10% des propriétés avec le plus d'avis (dans tout le NZ), combien à Christchurch
 
 
 seuil = df["number_of_reviews"].quantile(0.90)
 top10pct = df[df["number_of_reviews"] >= seuil]
-
 print(f"Nombre total dans le top 10% (NZ) : {len(top10pct)}")
 
 top10pct_chch = top10pct[top10pct["region_parent_name"] == "Christchurch City"]
