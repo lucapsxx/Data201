@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 
 
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-df["price"].hist(bins=50, ax=axes[0])
+df["price"].hist(bins=50, ax=axes[0]) # BINS 
 axes[0].set_title("Distribution des prix - Nouvelle-Zélande")
 axes[0].set_xlabel("Prix")
 
