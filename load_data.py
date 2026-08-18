@@ -3,6 +3,7 @@ import pandas as pd
 df = pd.read_csv('/Users/debraylouis/Desktop/DATA 202 /Data set /listings.csv')
 print(df.shape)
 
+display(df) #sdfskvdjvh
 
 df_chch = df[df["region_parent_name"] == "Christchurch City"].copy()
 print(df_chch.shape)
