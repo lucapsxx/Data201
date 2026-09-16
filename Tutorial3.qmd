@@ -1,0 +1,10 @@
+---
+title: "Assignment 3"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+house_data <- read_csv("kc_house_data.csv")
+```
