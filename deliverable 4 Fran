@@ -4,3 +4,26 @@ import pandas as pd
 # Load dataset
 df = pd.read_csv('listings_christchurch_output.csv')
 print(df.shape)
+
+#filtering for price since the bulk of the listings are below 1500 and we want to remove outliers so we get a better view of the underlying trend
+df = df[df["price"] < 1500]
+
+
+# We have decided to remove the following columns since they are unlikely to be needed to compare price and number of available properties 
+cols_to_drop = [
+    "minimum_nights",
+    "number_of_reviews",
+    "last_review",
+    "reviews_per_month",
+    "calculated_host_listings_count",
+    "number_of_reviews_ltm",
+    "license",
+]
+
+
+df = df.drop(columns=cols_to_drop)
+
+# Remove rows with missing values
+df = df.dropna()
+
+print(df.shape)
