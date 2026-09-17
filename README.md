@@ -44,3 +44,6 @@ number_of_reviews_ltm: The number of reviews the listing has in the last 12 mont
 
 license: The license/permit/registration number - text
 
+
+
+### Quarterly Tenancy dataset
