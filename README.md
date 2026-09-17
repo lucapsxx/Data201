@@ -47,3 +47,21 @@ license: The license/permit/registration number - text
 
 
 ### Quarterly Tenancy dataset
+About Tenancy dataset
+  Source: https://www.tenancy.govt.nz/about-tenancy-services/data-and-statistics/rental-bond-data/
+The dataset comes from Tenancy Services NZ and contains private rental bonds information. The data is updated monthly and contains data from January 2020 to April 2026.
+
+Columns:
+
+  TimeFrame: The time at which the rental information is being reported
+  Location Id: Identifier for the location
+  Dwelling Type: What type of dwelling for example, house, flat etc
+  Number Of Beds: Number of bedrooms in the dwelling
+  Total Bonds: The total number of bonds recorded in that time frame in that specific area. Essentially shows how many new tenants moved into that area
+  Active Bonds: The total number of bonds held by tenancy services during the specific time frame and area. Shows how many active tenants there are
+  Closed Bonds: The total number of bonds that were refunded or closed during the specific time frame and area. Shows how many tenancies ended.
+  Median Rent: The median rent for the specific area
+  Geometric Mean Rent: The logarithmic mean rent which reduces the impact of outliers
+  Upper Quartile Rent: The 75th percentile weekly rent
+  Lower Quartile Rent: The 25th percentile weekly rent
+  Log Std Dev Weekly Rent: The standard deviation of the log transformation of weekly rent
