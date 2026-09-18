@@ -30,7 +30,6 @@ df = df[
 
 #Dropping unecessary columns
 df = df.drop(columns = {
-    "total_bonds", 
     "active_bonds", 
     "closed_bonds", 
     "geometric_mean_rent",
