@@ -32,7 +32,6 @@ df = df[
 df = df.drop(columns = {
     "active_bonds", 
     "closed_bonds", 
-    "geometric_mean_rent",
     "upper_quartile_rent",
     "lower_quartile_rent",
     "log_std_dev_weekly_rent"
