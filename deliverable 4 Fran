@@ -3,18 +3,17 @@
 import pandas as pd
 
 # Load dataset
-df = pd.read_csv("Data201/data/listings_christchurch_output.csv")
+df = pd.read_csv("data/listings_christchurch_output.csv")
 print(df.shape)
 
 #filtering for price since the bulk of the listings are below 1500 and we want to remove outliers so we get a better view of the underlying trend
 #this loses 343 listings
-df = df[df["price"] < 1500]
+df = df[df["price"] < 3000]
 
 
 # We have decided to remove the following columns since they are unlikely to be needed to compare price and number of available properties 
 
 cols_to_drop = [
-    "minimum_nights",
     "number_of_reviews",
     "last_review",
     "reviews_per_month",
@@ -32,3 +31,5 @@ df = df.dropna()
 
 print(df.shape)
 #total lost from cleaning is 605 listings, 3513 to 2908
+OUTPUT = "data/airbnbcleaned.csv"
+df.to_csv(OUTPUT, index = False)
