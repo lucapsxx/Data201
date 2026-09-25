@@ -1,8 +1,8 @@
 import pandas as pd
 
 #reading
-INPUT= "data/QuarterlyTenency_2020_2026.csv"
-OUTPUT = "data/QuarterlyTenencyCleaned.csv"
+INPUT= "Data201/data/QuarterlyTenency_2020_2026.csv"
+OUTPUT = "Data201/data/QuarterlyTenencyCleaned.csv"
 df = pd.read_csv(INPUT)
 
 print(df.shape)
