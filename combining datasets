@@ -84,3 +84,5 @@ new_table.to_csv(OUTPUT, index = False)
 
 #Christchurch central has the most airbnbs to rentals ratio and Spreydon has the least airbnbs to rentals ratio
 #this makes sense as when people come to stay in Christchurch for breif trips, they typically stay in the city centre
+
+print(differences_table["num_b"])
