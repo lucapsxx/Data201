@@ -52,7 +52,7 @@ area_summary = (
     )
     .reset_index()
 )
-
+print(len(area_summary))
 #this sorts all the values by their differences and finds the mean difference between all the areas within neighbourhoods
 # there wouldnt be much difference between using sum or mean in this case
 
