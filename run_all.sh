@@ -5,6 +5,8 @@
 #./run_all.sh
 
 set -e
+echo "=== Running merge listings Fran ==="
+python3 "merge listings"
 
 echo "=== Running deliverable4 Fran ==="
 python3 "Cleaning"
