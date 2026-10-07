@@ -1,29 +1,56 @@
+"""
+Airbnb vs long-term rental analysis (Christchurch).
 
+Usage (run from the Data201 folder, in the terminal):
+    export KOORDINATES_API_KEY="your_key"      # only needed for --lookup
+
+    python deliverable7.py                     # analysis only (fast, safe to re-run)
+    python deliverable7.py --merge             # clean new_airbnb.csv and append to airbnbcleaned.csv (run ONCE per new scrape)
+    python deliverable7.py --lookup            # (re)do the Koordinates area-code lookup
+    python deliverable7.py --merge --lookup    # both, then the analysis
+
+Nothing runs at import time: every step lives in a function and is called from main().
+The area-code lookup uses threads instead of multiprocessing, so no worker ever
+re-imports this file (that re-import was what re-ran everything and spawned the charts).
+"""
 import argparse
 import os
 import time
- 
+from concurrent.futures import ThreadPoolExecutor
+
+import matplotlib
+import matplotlib.pyplot as plt
 import pandas as pd
 import requests
-from multiprocessing import Pool
 
-import pandas as pd
+# ---------------- CONFIG ----------------
+NEW_AIRBNB_CSV = "data/newairbnb.csv"
+CLEANED_CSV = "data/airbnbcleaned.csv"
+AREA_CODES_CSV = "data/airbnb_with_area_codes.csv"
+TENANCY_CSV = "data/QuarterlyTenencyCleaned.csv"
+MERGED_OUTPUT_CSV = "data/merged_listings.csv"
 
+API_KEY = os.environ.get("KOORDINATES_API_KEY")  # never hard-code the key
+DOMAIN = "koordinates.com"
+LAYER_ID = 111227
+AREA_CODE_FIELD = "SA22023_V1_00"
+RADIUS_M = 100
+MAX_RESULTS = 1
+N_THREADS = 10  # drop to 5 if you see lots of "Failed for ..." lines
+BASE_URL = f"https://{DOMAIN}/services/query/v1/vector.json"
+# -----------------------------------------
+print(len(pd.read_csv(CLEANED_CSV)))
+print(len(pd.read_csv(AREA_CODES_CSV)))
+print(len(pd.read_csv(NEW_AIRBNB_CSV)))
+print(len(pd.read_csv(MERGED_OUTPUT_CSV)))
 
-#reading
-INPUT= "data/QuarterlyTenency_2020_2026.csv"
-
-def clean_airbnb(file):
-  
-    df = file
-
-    #filtering for price since the bulk of the listings are below 1500 and we want to remove outliers so we get a better view of the underlying trend
-    #this loses 343 listings
+# ============ Step 1: clean + merge ============
+def clean_airbnb(df):
+    # Keep price < 3000: the bulk of listings are below 1500 and we want to drop
+    # outliers to see the underlying trend (this loses ~343 listings).
     df = df[df["price"] < 3000]
 
-
-    # We have decided to remove the following columns since they are unlikely to be needed to compare price and number of available properties 
-
+    # Columns not needed to compare price and number of available properties
     cols_to_drop = [
         "number_of_reviews",
         "last_review",
@@ -32,215 +59,186 @@ def clean_airbnb(file):
         "number_of_reviews_ltm",
         "license",
     ]
-
     df = df.drop(columns=cols_to_drop)
+    df = df[df["neighbourhood_group"] == "Christchurch City"]
+    return df.dropna()
 
 
-    # Remove rows with missing values
-    df = df.dropna()
-    return df
-
-def merge_airbnb(old, new):
-    df = pd.concat([old, new], ignore_index=True)
-    df.to_csv("data/airbnbcleaned.csv", index=False)
-    
-new_airbnb = pd.read_csv("data/new_airbnb.csv")
-old_airbnb = pd.read_csv("data/airbnbcleaned.csv")
-
-clean_airbnb(new_airbnb)
-merge_airbnb(old_airbnb, new_airbnb)
-
-
-def get_area_codes(file):
-
-    # ---------------- CONFIG ----------------
-    API_KEY = os.environ.get("Fran Key", "247afde54abf4348ad4eb75e2e036b41")
-    DOMAIN = "koordinates.com"          # change if the layer lives on a different Koordinates site
-    LAYER_ID = 111227               # <-- fill in with the Stats NZ area-code layer ID
-    AREA_CODE_FIELD = "SA22023_V1_00"   # <-- fill in with the real field name (see test query output)
-    RADIUS_M = 100                      # search radius in metres around each point
-    MAX_RESULTS = 1
-    N_PROCESSES = 10                    # keep modest so you don't hammer the API / hit rate limits
-
-    INPUT_CSV = file
-    OUTPUT_CSV = "data/airbnb_with_area_codes.csv"
-
-    BASE_URL = f"https://{DOMAIN}/services/query/v1/vector.json"
-    # -----------------------------------------
-
-
-    def query_point(lat, lon, max_retries=3, verbose=False):
-        """Query the Vector Query API for one point. Returns the area code
-        (or None if nothing found / all retries failed)."""
-        params = {
-            "key": API_KEY,
-            "layer": LAYER_ID,
-            "x": lon,
-            "y": lat,
-            "radius": RADIUS_M,
-            "max_results": MAX_RESULTS,
-            "geometry": "false",
-            "with_field_names": "true",
-        }
-
-        for attempt in range(max_retries):
-            try:
-                resp = requests.get(BASE_URL, params=params, timeout=10)
-                resp.raise_for_status()
-                data = resp.json()
-
-                if verbose:
-                    print(data)
-
-                layers = data.get("vectorQuery", {}).get("layers", {})
-                features = layers.get(str(LAYER_ID), {}).get("features", [])
-                if not features:
-                    return None
-                return features[0]["properties"].get(AREA_CODE_FIELD)
-
-            except requests.exceptions.RequestException as e:
-                if attempt == max_retries - 1:
-                    print(f"Failed for ({lat}, {lon}): {e}")
-                    return None
-                time.sleep(1 + attempt)  # simple backoff before retrying
+# ============ Step 2: area-code lookup ============
+def query_point(lat, lon, max_retries=3, verbose=False):
+    """Return the area code for one point, or None."""
+    params = {
+        "key": API_KEY,
+        "layer": LAYER_ID,
+        "x": lon,
+        "y": lat,
+        "radius": RADIUS_M,
+        "max_results": MAX_RESULTS,
+        "geometry": "false",
+        "with_field_names": "true",
+    }
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(BASE_URL, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            if verbose:
+                print(data)
+            layers = data.get("vectorQuery", {}).get("layers", {})
+            features = layers.get(str(LAYER_ID), {}).get("features", [])
+            if not features:
+                return None
+            return features[0]["properties"].get(AREA_CODE_FIELD)
+        except requests.exceptions.RequestException as e:
+            if attempt == max_retries - 1:
+                print(f"Failed for ({lat}, {lon}): {e}")
+                return None
+            time.sleep(1 + attempt)
 
 
-    def _query_row(row):
-        """Helper for multiprocessing.Pool: row is (index, lat, lon)."""
-        idx, lat, lon = row
-        return idx, query_point(lat, lon)
+def _query_row(row):
+    idx, lat, lon = row
+    return idx, query_point(lat, lon)
 
 
-    def run_batch():
-        if API_KEY == "YOUR_API_KEY_HERE":
-            raise SystemExit("Set KOORDINATES_API_KEY (env var) or edit API_KEY in the script.")
-        if LAYER_ID == 12345:
-            raise SystemExit("Set LAYER_ID to the real Stats NZ layer ID before running the batch.")
+def get_area_codes(input_csv, output_csv=AREA_CODES_CSV):
+    if not API_KEY:
+        raise SystemExit("Set the KOORDINATES_API_KEY environment variable first.")
 
-        df = pd.read_csv(INPUT_CSV)
-        rows = list(df[["latitude", "longitude"]].itertuples(name=None))  # (index, lat, lon)
+    df = pd.read_csv(input_csv)
+    rows = list(df[["latitude", "longitude"]].itertuples(name=None))  # (index, lat, lon)
+    print(f"Querying {len(rows)} points against layer {LAYER_ID}...")
 
-        print(f"Querying {len(rows)} points against layer {LAYER_ID}...")
+    results = {}
+    with ThreadPoolExecutor(max_workers=N_THREADS) as ex:
+        for i, (idx, code) in enumerate(ex.map(_query_row, rows), 1):
+            results[idx] = code
+            if i % 500 == 0:
+                print(f"  {i}/{len(rows)} done")
 
-        results = {}
-        with Pool(processes=N_PROCESSES) as pool:
-            for i, (idx, area_code) in enumerate(pool.imap_unordered(_query_row, rows), 1):
-                results[idx] = area_code
-                if i % 100 == 0:
-                    print(f"  {i}/{len(rows)} done")
+    df["area_code"] = df.index.map(results)
+    df.to_csv(output_csv, index=False)
+    print(f"Saved to {output_csv}")
 
-        df["area_code"] = df.index.map(results)
-        df.to_csv(OUTPUT_CSV, index=False)
-        print(f"Saved to {OUTPUT_CSV}")
-
-        missing = df["area_code"].isna().sum()
-        if missing:
-            print(f"Warning: {missing} rows got no match (outside radius, bad coords, etc.)")
+    missing = df["area_code"].isna().sum()
+    if missing:
+        print(f"Warning: {missing} rows got no match")
 
 
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--test", nargs=2, type=float, metavar=("LAT", "LON"),
-                            help="Test a single lat/lon query and print the raw response, "
-                                "e.g. --test -36.8485 174.7633")
-        args = parser.parse_args()
-
-        if args.test:
-            lat, lon = args.test
-            if API_KEY == "YOUR_API_KEY_HERE":
-                raise SystemExit("Set KOORDINATES_API_KEY (env var) or edit API_KEY in the script.")
-            print(f"Testing query for lat={lat}, lon={lon}...")
-            result = query_point(lat, lon, verbose=True)
-            print(f"\nExtracted area code (field '{AREA_CODE_FIELD}'): {result}")
-        else:
-            run_batch()
-
-airbnb_cleaned = "data/airbnbcleaned.csv"
-get_area_codes(airbnb_cleaned)
-
-# Load dataset
-listings = pd.read_csv("data/airbnb_with_area_codes.csv")
-tenency = pd.read_csv("data/QuarterlyTenencyCleaned.csv")
-
-new_table = pd.merge(listings, tenency, how="left", left_on="area_code", right_on="location_id")
-print(new_table)
-
-#finding median AirBNB price in chch central
-chch_central = new_table[new_table["area_code"] == 326600]
-print(chch_central["price"].median())
-#the median AirBNB price in chch central is $253 per night
-
-# Find average difference between airbnb per night and rental per night
-differences_table = new_table[(new_table["dwelling_type"] == "ALL") & (new_table["number_of_beds"] == "ALL")].copy()
-differences_table["difference"] = differences_table["price"] - (differences_table["geometric_mean_rent"] / 7)
-print(differences_table)
+# ============ Step 3: analysis ============
+def save_bar(x, y, xlabel, ylabel, title, filename):
+    fig, ax = plt.subplots(figsize=(14, 6))
+    ax.bar(x, y)
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    plt.xticks(rotation=90)
+    fig.tight_layout()
+    fig.savefig(filename, dpi=150)
+    plt.close(fig)  # close instead of plt.show() so no windows pile up
+    print(f"Saved {filename}")
 
 
-import matplotlib.pyplot as plt
+def run_analysis():
+    df = pd.read_csv("data/new_airbnb.csv", low_memory=False)
 
-#sorting
-diff_by_area = differences_table.groupby(["area_code", "neighbourhood"])["difference"].mean().reset_index()
-diff_by_area = diff_by_area.sort_values("difference") 
+    listings = pd.read_csv(AREA_CODES_CSV)
+    tenancy = pd.read_csv(TENANCY_CSV)
 
-#plot
-fig, ax = plt.subplots(figsize=(14, 6))
-ax.bar(diff_by_area["area_code"].astype(str), diff_by_area["difference"])
-ax.axhline(0, color="black", linewidth=0.8) 
-ax.set_xlabel("Area code")
-ax.set_ylabel("Avg difference (Airbnb nightly price − weekly rent/7)")
-ax.set_title("Difference between Airbnb price and daily-equivalent rent, by area")
-plt.xticks(rotation=90)
-plt.tight_layout()
-plt.savefig("difference_by_area.png", dpi=150)
-plt.show()
-
-max_row = diff_by_area.loc[diff_by_area["difference"].idxmax()]
-print(max_row["neighbourhood"])
-
-#the max difference is in papanui with an airbnb costing $522 more per night than a rental
-
-#this creates two new columns for each different area code with the number of airbnbs which is just the count of the different names
-# the other column is total bonds
-area_summary = (
-    differences_table
-    .groupby(["area_code", "neighbourhood"])
-    .agg(
-        num_bnbs=("name", "nunique"),        
-        total_bonds=("total_bonds", "first")  
+    new_table = pd.merge(
+        listings, tenancy, how="left", left_on="area_code", right_on="location_id"
     )
-    .reset_index()
-)
+    print(new_table)
 
-#this sorts all the values by their differences and finds the mean difference between all the areas within neighbourhoods
-# there wouldnt be much difference between using sum or mean in this case
+    # Median Airbnb price in Christchurch Central (area code 326600)
+    chch_central = new_table[new_table["area_code"] == 326600]
+    print("Median Airbnb price, chch central:", chch_central["price"].median())
+    # -> $253 per night
 
-bnb_vs_rental = area_summary.copy()
-bnb_vs_rental["differences"] = bnb_vs_rental["total_bonds"] - bnb_vs_rental["num_bnbs"]
-bnb_vs_rental = bnb_vs_rental.sort_values("differences")
-neighbourhood_summary = (
-    bnb_vs_rental
-    .groupby("neighbourhood")["differences"]
-    .mean()
-    .reset_index()
-    .sort_values("differences")
-)
+    # Average difference between Airbnb per night and rental per night
+    differences_table = new_table[
+        (new_table["dwelling_type"] == "ALL") & (new_table["number_of_beds"] == "ALL")
+    ].copy()
+    differences_table["difference"] = differences_table["price"] - (
+        differences_table["geometric_mean_rent"] / 7
+    )
+    print(differences_table)
 
-#plot
-fig, ax = plt.subplots(figsize=(14, 6))
-ax.bar(neighbourhood_summary["neighbourhood"], neighbourhood_summary["differences"])
-ax.axhline(0, color="black", linewidth=0.8)
-ax.set_xlabel("Neighbourhood (Ward)")
-ax.set_ylabel("Total bonds − number of Airbnb listings")
-ax.set_title("Long-term rentals vs Airbnb listings by ward")
-plt.xticks(rotation=90)
-plt.tight_layout()
-plt.savefig("bnb_vs_rental_by_ward.png", dpi=150)
-plt.show()
-print(bnb_vs_rental)
-OUTPUT = "data/merged_listings.csv"
-new_table.to_csv(OUTPUT, index = False)
+    diff_by_area = (
+        differences_table.groupby(["area_code", "neighbourhood"])["difference"]
+        .mean()
+        .reset_index()
+        .sort_values("difference")
+    )
+    save_bar(
+        diff_by_area["area_code"].astype(str),
+        diff_by_area["difference"],
+        "Area code",
+        "Avg difference (Airbnb nightly price - weekly rent/7)",
+        "Difference between Airbnb price and daily-equivalent rent, by area",
+        "difference_by_area.png",
+    )
 
-#Christchurch central has the most airbnbs to rentals ratio and Spreydon has the least airbnbs to rentals ratio
-#this makes sense as when people come to stay in Christchurch for breif trips, they typically stay in the city centre
+    max_row = diff_by_area.loc[diff_by_area["difference"].idxmax()]
+    print("Largest difference:", max_row["neighbourhood"])
+    # -> Papanui, an Airbnb costing ~$522 more per night than a rental
 
-print(differences_table["num_b"])
+    # Number of Airbnbs (unique names) and total bonds per area
+    area_summary = (
+        differences_table.groupby(["area_code", "neighbourhood"])
+        .agg(
+            num_bnbs=("name", "nunique"),
+            total_bonds=("total_bonds", "first"),
+        )
+        .reset_index()
+    )
+
+    bnb_vs_rental = area_summary.copy()
+    bnb_vs_rental["differences"] = bnb_vs_rental["total_bonds"] - bnb_vs_rental["num_bnbs"]
+    bnb_vs_rental = bnb_vs_rental.sort_values("differences")
+
+    neighbourhood_summary = (
+        bnb_vs_rental.groupby("neighbourhood")["differences"]
+        .mean()
+        .reset_index()
+        .sort_values("differences")
+    )
+    save_bar(
+        neighbourhood_summary["neighbourhood"],
+        neighbourhood_summary["differences"],
+        "Neighbourhood (Ward)",
+        "Total bonds - number of Airbnb listings",
+        "Long-term rentals vs Airbnb listings by ward",
+        "bnb_vs_rental_by_ward.png",
+    )
+    print(bnb_vs_rental)
+
+    new_table.to_csv(MERGED_OUTPUT_CSV, index=False)
+    print(f"Saved {MERGED_OUTPUT_CSV}")
+
+    # Christchurch Central has the most Airbnbs relative to rentals and Spreydon the
+    # fewest. This makes sense: people visiting for brief trips stay in the city centre.
+
+
+# ============ Entry point ============
+def main():
+    matplotlib.use("Agg")  # draw straight to files, never open windows
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--merge", action="store_true",
+                        help="clean new_airbnb.csv and append it to airbnbcleaned.csv")
+    parser.add_argument("--lookup", action="store_true",
+                        help="redo the Koordinates area-code lookup")
+    args = parser.parse_args()
+
+    if args.merge:
+        run_merge()
+    if args.lookup or not os.path.exists(AREA_CODES_CSV):
+        get_area_codes(CLEANED_CSV)
+    
+    run_analysis()
+
+
+if __name__ == "__main__":
+    main()

@@ -3,7 +3,7 @@
 import pandas as pd
 
 # Load dataset
-df = pd.read_csv("data/listings_christchurch_output.csv")
+df = pd.read_csv("data/newairbnb.csv")
 print(df.shape)
 
 #filtering for price since the bulk of the listings are below 1500 and we want to remove outliers so we get a better view of the underlying trend
@@ -28,7 +28,7 @@ df = df.drop(columns=cols_to_drop)
 # Remove rows with missing values
 df = df.dropna()
 #this loses 262 listings
-
+df = df[df["neighbourhood_group"] == "Christchurch City"]
 print(df.shape)
 #total lost from cleaning is 605 listings, 3513 to 2908
 OUTPUT = "data/airbnbcleaned.csv"
