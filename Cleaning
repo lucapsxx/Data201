@@ -3,7 +3,7 @@
 import pandas as pd
 
 # Load dataset
-df = pd.read_csv("data/newairbnb.csv")
+df = pd.read_csv("data/airbnbcleaned.csv")
 print(df.shape)
 
 #filtering for price since the bulk of the listings are below 1500 and we want to remove outliers so we get a better view of the underlying trend
