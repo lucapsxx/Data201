@@ -8,10 +8,10 @@ set -e
 echo "=== Running merge listings Fran ==="
 python3 "merge listings"
 
-echo "=== Running deliverable4 Fran ==="
+echo "=== Running Cleaning Fran ==="
 python3 "Cleaning"
 
-echo "=== Running deliverable5 Fran ==="
+echo "=== Running Get area codes Fran ==="
 python3 "Get Area Codes"
 
 echo "=== Running combining datasets ==="
