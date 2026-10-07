@@ -1,15 +1,18 @@
 #!/bin/bash
 # Runs the three pipeline scripts in order.
 # Stops immediately if any one of them fails (non-zero exit code).
+#chmod +x run_all.sh
+#./run_all.sh
+
 set -e
 
 echo "=== Running deliverable4 Fran ==="
-python3 "deliverable4 Fran"
+python3 "Cleaning"
 
 echo "=== Running deliverable5 Fran ==="
-python3 "deliverable5 Fran"
+python3 "Get Area Codes"
 
 echo "=== Running combining datasets ==="
-python3 "combining datasets"
+python3 "combining datasets and plots"
 
 echo "=== All three scripts finished successfully ==="
