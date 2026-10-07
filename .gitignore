@@ -219,3 +219,6 @@ __marimo__/
 
 #For storing csvs in data file locally
 data/*.csv
+
+#ignore env file for local env
+myenv/
