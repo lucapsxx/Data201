@@ -1,0 +1,20 @@
+Index: load_data.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import matplotlib.pyplot as plt\r\nimport pandas as pd\r\n\r\n# Load dataset\r\ndf = pd.read_csv('listings-2.csv')\r\nprint(df.shape)\r\n\r\n\r\n# Clean price column on full dataset\r\ndf['price'] = df['price'].replace('[\\$,]', '', regex=True).astype(float)\r\n\r\n# Filter for Christchurch City\r\ndf_chch = df[df['neighbourhood_group'] == 'Christchurch City'].copy()\r\n\r\nprint(df_chch.shape)\r\n\r\n# Add month_year column\r\ndf_chch['month_year'] = '2026-5'\r\ndf_chch['last_scraped'] = pd.Timestamp.now().normalize()\r\n# Calculate days since last review for Christchurch\r\ndf_chch['last_review'] = pd.to_datetime(df_chch['last_review'])\r\n\r\ndf_chch['days_since_last_review'] = (\r\n    df_chch['last_scraped'] - df_chch['last_review']\r\n).dt.days\r\n\r\n# ==========================================\r\n# SAVE CHRISTCHURCH DATASET TO CSV\r\n# ==========================================\r\noutput_csv = (\r\n    'listings_christchurch_output.csv'\r\n)\r\ndf_chch.to_csv(output_csv, index=False)\r\nprint(f'Christchurch output CSV saved to: {output_csv}')\r\n\r\n\r\n# 4. Summary table function\r\ndef summarize(df_in):\r\n  summary = pd.DataFrame({\r\n      'dtype': df_in.dtypes,\r\n      'missing': df_in.isna().sum(),\r\n      'missing_pct': (df_in.isna().sum() / len(df_in) * 100).round(1),\r\n      'n_unique': df_in.nunique(),\r\n  })\r\n  numeric_stats = df_in.describe().T[['min', 'max', 'mean', 'std']]\r\n  summary = summary.join(numeric_stats)\r\n  return summary\r\n\r\n\r\nresume = summarize(df_chch)\r\n\r\n\r\n# Price Histograms\r\nfig, axes = plt.subplots(1, 2, figsize=(12, 5))\r\ndf['price'].hist(bins=50, ax=axes[0])\r\naxes[0].set_title('Distribution des prix - Nouvelle-Zélande')\r\naxes[0].set_xlabel('Prix')\r\n\r\ndf_chch['price'].hist(bins=50, ax=axes[1])\r\naxes[1].set_title('Distribution des prix - Christchurch')\r\naxes[1].set_xlabel('Prix')\r\n\r\nplt.tight_layout()\r\nplt.show()\r\n\r\n# Histogram: Days since last review\r\nplt.figure(figsize=(8, 5))\r\ndf_chch['days_since_last_review'].hist(bins=50)\r\nplt.xlabel('Jours depuis le dernier avis')\r\nplt.ylabel(\"Nombre d'annonces\")\r\nplt.title('Distribution du délai depuis le dernier avis - Christchurch')\r\nplt.show()\r\n\r\n# Top 10% most reviewed properties in NZ\r\nseuil = df['number_of_reviews'].quantile(0.90)\r\ntop10pct = df[df['number_of_reviews'] >= seuil]\r\nprint(f'Nombre total dans le top 10% (NZ) : {len(top10pct)}')\r\n\r\ntop10pct_chch = top10pct[top10pct['region_parent_name'] == 'Christchurch City']\r\nprint(f'Dont à Christchurch : {len(top10pct_chch)}')
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/load_data.py b/load_data.py
+--- a/load_data.py	(revision 27aa3ab7f92a79bc01455d084c56a9f60db0ec9f)
++++ b/load_data.py	(date 1790299300291)
+@@ -2,7 +2,8 @@
+ import pandas as pd
+ 
+ # Load dataset
+-df = pd.read_csv('listings-2.csv')
++#df = pd.read_csv('listings-2.csv') # initial
++df = pd.read_csv('data/listings-2.csv') # after change
+ print(df.shape)
+ 
+ 
