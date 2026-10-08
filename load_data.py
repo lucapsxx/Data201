@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Load dataset
-df = pd.read_csv('listings-2.csv')
+#df = pd.read_csv('listings-2.csv') # initial
+df = pd.read_csv('data/listings-2.csv') # after change
 print(df.shape)
 
 
